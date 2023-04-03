@@ -1,0 +1,251 @@
+<TrustFrameworkPolicy xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns="http://schemas.microsoft.com/online/cpim/schemas/2013/06" PolicySchemaVersion="0.3.0.0" TenantId="bcportfolioauthtest.onmicrosoft.com" PolicyId="B2C_1A_TrustFrameworkExtensions" PublicPolicyUri="http://bcportfolioauthtest.onmicrosoft.com/B2C_1A_TrustFrameworkExtensions" TenantObjectId="92bf62b3-a2a6-4e40-acc0-0c53c340b810">
+  <BasePolicy>
+    <TenantId>bcportfolioauthtest.onmicrosoft.com</TenantId>
+    <PolicyId>B2C_1A_TrustFrameworkLocalization</PolicyId>
+  </BasePolicy>
+  <BuildingBlocks>
+    <ClaimsSchema>
+      <ClaimType Id="portfolioMemberCompany">
+        <DisplayName>Is a member of a portfolio company</DisplayName>
+        <DataType>string</DataType>
+        <UserInputType>Readonly</UserInputType>
+      </ClaimType>
+      <ClaimType Id="domainName">
+        <DisplayName>Domain of user account</DisplayName>
+        <DataType>string</DataType>
+        <UserInputType>Readonly</UserInputType>
+      </ClaimType>
+      <ClaimType Id="errorMessage">
+        <DisplayName>Account not yet approved</DisplayName>
+        <DataType>string</DataType>
+        <UserHelpText>Please contact infosec@blenheimchalcot.com for help.</UserHelpText>
+        <UserInputType>Paragraph</UserInputType>
+      </ClaimType>
+    </ClaimsSchema>
+    <ClaimsTransformations>
+      <ClaimsTransformation Id="CreateBlockedUserErrorMessage" TransformationMethod="FormatStringClaim">
+        <InputClaims>
+          <InputClaim ClaimTypeReferenceId="domainName" TransformationClaimType="inputClaim" />
+        </InputClaims>
+        <InputParameters>
+          <InputParameter Id="stringFormat" DataType="string" Value="Your account is from the domain name '{0}', which has not been approved for access to this service.  Please contact infosec@blenheimchalcot.com if you think this is wrong." />
+        </InputParameters>
+        <OutputClaims>
+          <OutputClaim ClaimTypeReferenceId="errorMessage" TransformationClaimType="outputClaim" />
+        </OutputClaims>
+      </ClaimsTransformation>
+      <ClaimsTransformation Id="ParseDomainName" TransformationMethod="ParseDomain">
+        <InputClaims>
+          <InputClaim ClaimTypeReferenceId="email" TransformationClaimType="emailAddress" />
+        </InputClaims>
+        <OutputClaims>
+          <OutputClaim ClaimTypeReferenceId="domainName" TransformationClaimType="domain" />
+        </OutputClaims>
+      </ClaimsTransformation>
+      <ClaimsTransformation Id="DomainPortfolioChecker" TransformationMethod="LookupValue">
+        <InputClaims>
+          <InputClaim ClaimTypeReferenceId="domainName" TransformationClaimType="inputParameterId" />
+        </InputClaims>
+        <InputParameters>
+          <InputParameter Id="englishscore.com" DataType="string" Value="true" />
+          <InputParameter Id="blenheimchalcot.com" DataType="string" Value="true" />
+          <InputParameter Id="errorOnFailedLookup" DataType="boolean" Value="false" />
+        </InputParameters>
+        <OutputClaims>
+          <OutputClaim ClaimTypeReferenceId="portfolioMemberCompany" TransformationClaimType="outputClaim" />
+        </OutputClaims>
+      </ClaimsTransformation>
+    </ClaimsTransformations>
+  </BuildingBlocks>
+  <ClaimsProviders>
+    <!-- from https://github.com/azure-ad-b2c/samples/tree/master/policies/disable-social-account-from-logon/policy -->
+    <!-- and from https://medium.com/the-new-control-plane/creating-an-error-page-for-an-azure-ad-b2c-custom-policy-flow-fb2692a3b50f -->
+    <ClaimsProvider>
+      <DisplayName>Block page</DisplayName>
+      <TechnicalProfiles>
+        <TechnicalProfile Id="BlockedUserPage">
+          <DisplayName>Page for blocked User</DisplayName>
+          <Protocol Name="Proprietary" Handler="Web.TPEngine.Providers.SelfAssertedAttributeProvider, Web.TPEngine, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null" />
+          <Metadata>
+            <Item Key="ContentDefinitionReferenceId">api.selfasserted</Item>
+            <Item Key="setting.showContinueButton">false</Item>
+            <Item Key="setting.showCancelButton">false</Item>
+          </Metadata>
+          <InputClaims>
+            <InputClaim ClaimTypeReferenceId="errorMessage" />
+          </InputClaims>
+          <OutputClaims>
+            <OutputClaim ClaimTypeReferenceId="errorMessage" />
+          </OutputClaims>
+          <UseTechnicalProfileForSessionManagement ReferenceId="SM-Noop" />
+        </TechnicalProfile>
+        <TechnicalProfile Id="StartBlockedUserPage">
+          <InputClaimsTransformations>
+            <InputClaimsTransformation ReferenceId="CreateBlockedUserErrorMessage" />
+          </InputClaimsTransformations>
+          <IncludeTechnicalProfile ReferenceId="BlockedUserPage" />
+        </TechnicalProfile>
+      </TechnicalProfiles>
+    </ClaimsProvider>
+    <!-- from https://learn.microsoft.com/en-us/azure/active-directory-b2c/identity-provider-azure-ad-multi-tenant?pivots=b2c-user-flow -->
+    <ClaimsProvider>
+      <Domain>commonaad</Domain>
+      <DisplayName>Common AAD</DisplayName>
+      <TechnicalProfiles>
+        <TechnicalProfile Id="AADCommon-OpenIdConnect">
+          <DisplayName>Microsoft</DisplayName>
+          <Description>Login with your work account</Description>
+          <Protocol Name="OpenIdConnect" />
+          <Metadata>
+            <Item Key="METADATA">https://login.microsoftonline.com/common/v2.0/.well-known/openid-configuration</Item>
+            <!-- Update the Client ID below to the Application ID -->
+            <Item Key="client_id">83c339b7-cd87-4285-a1bb-da3dc997ad76</Item>
+            <Item Key="response_types">code</Item>
+            <Item Key="scope">openid profile email</Item>
+            <Item Key="response_mode">form_post</Item>
+            <Item Key="HttpBinding">POST</Item>
+            <Item Key="UsePolicyInRedirectUri">false</Item>
+            <Item Key="DiscoverMetadataByTokenIssuer">true</Item>
+            <!-- The key below allows you to specify each of the Azure AD tenants that can be used to sign in. Update the GUIDs below for each tenant. -->
+            <!-- <Item Key="ValidTokenIssuerPrefixes">https://login.microsoftonline.com/00000000-0000-0000-0000-000000000000,https://login.microsoftonline.com/11111111-1111-1111-1111-111111111111</Item> -->
+            <!-- The commented key below specifies that users from any tenant can sign-in. Uncomment if you would like anyone with an Azure AD account to be able to sign in. -->
+            <Item Key="ValidTokenIssuerPrefixes">https://login.microsoftonline.com/</Item>
+          </Metadata>
+          <CryptographicKeys>
+            <Key Id="client_secret" StorageReferenceId="B2C_1A_AADAppSecret" />
+          </CryptographicKeys>
+          <OutputClaims>
+            <OutputClaim ClaimTypeReferenceId="issuerUserId" PartnerClaimType="oid" />
+            <OutputClaim ClaimTypeReferenceId="email" PartnerClaimType="email" />
+            <OutputClaim ClaimTypeReferenceId="givenName" PartnerClaimType="given_name" />
+            <OutputClaim ClaimTypeReferenceId="surname" PartnerClaimType="family_name" />
+            <OutputClaim ClaimTypeReferenceId="displayName" PartnerClaimType="name" />
+            <OutputClaim ClaimTypeReferenceId="authenticationSource" DefaultValue="socialIdpAuthentication" AlwaysUseDefaultValue="true" />
+            <OutputClaim ClaimTypeReferenceId="identityProvider" PartnerClaimType="iss" />
+            <!-- Blenheim Chalcot custom -->
+            <OutputClaim ClaimTypeReferenceId="portfolioMemberCompany" DefaultValue="false" />
+          </OutputClaims>
+          <OutputClaimsTransformations>
+            <OutputClaimsTransformation ReferenceId="CreateRandomUPNUserName" />
+            <OutputClaimsTransformation ReferenceId="CreateUserPrincipalName" />
+            <OutputClaimsTransformation ReferenceId="CreateAlternativeSecurityId" />
+            <OutputClaimsTransformation ReferenceId="CreateSubjectClaimFromAlternativeSecurityId" />
+            <!-- Blenheim Chalcot custom -->
+            <OutputClaimsTransformation ReferenceId="ParseDomainName" />
+            <OutputClaimsTransformation ReferenceId="DomainPortfolioChecker" />
+          </OutputClaimsTransformations>
+          <UseTechnicalProfileForSessionManagement ReferenceId="SM-SocialLogin" />
+        </TechnicalProfile>
+      </TechnicalProfiles>
+    </ClaimsProvider>
+    <!-- from https://github.com/MicrosoftDocs/azure-docs/blob/main/articles/active-directory-b2c/identity-provider-google.md -->
+    <ClaimsProvider>
+      <Domain>google.com</Domain>
+      <DisplayName>Google</DisplayName>
+      <TechnicalProfiles>
+        <TechnicalProfile Id="Google-OAuth2">
+          <DisplayName>Google</DisplayName>
+          <Protocol Name="OAuth2" />
+          <Metadata>
+            <Item Key="ProviderName">google</Item>
+            <Item Key="authorization_endpoint">https://accounts.google.com/o/oauth2/auth</Item>
+            <Item Key="AccessTokenEndpoint">https://accounts.google.com/o/oauth2/token</Item>
+            <Item Key="ClaimsEndpoint">https://www.googleapis.com/oauth2/v1/userinfo</Item>
+            <Item Key="scope">email profile openid</Item>
+            <Item Key="HttpBinding">POST</Item>
+            <Item Key="UsePolicyInRedirectUri">false</Item>
+            <!-- This client ID is a reference to the app registered in platform.google.com -->
+            <Item Key="client_id">22679788025-1moi1id07t7qe0cif91gc2a3nf0vspv2.apps.googleusercontent.com</Item>
+          </Metadata>
+          <CryptographicKeys>
+            <Key Id="client_secret" StorageReferenceId="B2C_1A_GoogleSecret" />
+          </CryptographicKeys>
+          <OutputClaims>
+            <!-- Standard -->
+            <OutputClaim ClaimTypeReferenceId="issuerUserId" PartnerClaimType="id" />
+            <OutputClaim ClaimTypeReferenceId="email" PartnerClaimType="email" />
+            <OutputClaim ClaimTypeReferenceId="givenName" PartnerClaimType="given_name" />
+            <OutputClaim ClaimTypeReferenceId="surname" PartnerClaimType="family_name" />
+            <OutputClaim ClaimTypeReferenceId="displayName" PartnerClaimType="name" />
+            <OutputClaim ClaimTypeReferenceId="authenticationSource" DefaultValue="socialIdpAuthentication" />
+            <OutputClaim ClaimTypeReferenceId="identityProvider" DefaultValue="google.com" />
+            <!-- Blenheim Chalcot custom -->
+            <OutputClaim ClaimTypeReferenceId="portfolioMemberCompany" DefaultValue="false" />
+          </OutputClaims>
+          <OutputClaimsTransformations>
+            <!-- Standard -->
+            <OutputClaimsTransformation ReferenceId="CreateRandomUPNUserName" />
+            <OutputClaimsTransformation ReferenceId="CreateUserPrincipalName" />
+            <OutputClaimsTransformation ReferenceId="CreateAlternativeSecurityId" />
+            <OutputClaimsTransformation ReferenceId="CreateSubjectClaimFromAlternativeSecurityId" />
+            <!-- Blenheim Chalcot custom -->
+            <OutputClaimsTransformation ReferenceId="ParseDomainName" />
+            <OutputClaimsTransformation ReferenceId="DomainPortfolioChecker" />
+          </OutputClaimsTransformations>
+          <UseTechnicalProfileForSessionManagement ReferenceId="SM-SocialLogin" />
+        </TechnicalProfile>
+      </TechnicalProfiles>
+    </ClaimsProvider>
+  </ClaimsProviders>
+  <UserJourneys>
+    <UserJourney Id="BlenheimChalcotSignUpOrSignIn">
+      <OrchestrationSteps>
+        <OrchestrationStep Order="1" Type="CombinedSignInAndSignUp" ContentDefinitionReferenceId="api.signuporsignin">
+          <ClaimsProviderSelections>
+            <ClaimsProviderSelection TargetClaimsExchangeId="MicrosoftAccountExchange" />
+            <ClaimsProviderSelection TargetClaimsExchangeId="GoogleExchange" />
+          </ClaimsProviderSelections>
+        </OrchestrationStep>
+        <OrchestrationStep Order="2" Type="ClaimsExchange">
+          <ClaimsExchanges>
+            <!-- Inside the following ClaimsExchange-s are where the Blenheim Chalcot validation happens, and the "domainName" / "portfolioMemberCompany" attributes get set -->
+            <ClaimsExchange Id="MicrosoftAccountExchange" TechnicalProfileReferenceId="AADCommon-OpenIdConnect" />
+            <ClaimsExchange Id="GoogleExchange" TechnicalProfileReferenceId="Google-OAuth2" />
+          </ClaimsExchanges>
+        </OrchestrationStep>
+        <!-- For social IDP authentication, attempt to find the user account in the directory. -->
+        <OrchestrationStep Order="3" Type="ClaimsExchange">
+          <ClaimsExchanges>
+            <ClaimsExchange Id="AADUserReadUsingAlternativeSecurityId" TechnicalProfileReferenceId="AAD-UserReadUsingAlternativeSecurityId-NoError" />
+          </ClaimsExchanges>
+        </OrchestrationStep>
+        <!-- Enrich our token (or reject) if the user isn't valid? -->
+        <!-- from https://learn.microsoft.com/en-us/azure/active-directory-b2c/add-api-connector-token-enrichment?pivots=b2c-custom-policy -->
+        <!-- Must happen before the "write" to AAD step - from https://stackoverflow.com/questions/67367092/azure-ad-b2c-custom-policy-rest-technical-profile-validation-doesnt-work -->
+        <!-- The previous step (SelfAsserted-Social) could have been skipped if there were no attributes to collect
+             from the user. So, in that case, create the user in the directory if one does not already exist
+             (verified using objectId which would be set from the last step if account was created in the directory. -->
+        <OrchestrationStep Order="4" Type="ClaimsExchange">
+          <Preconditions>
+            <Precondition Type="ClaimsExist" ExecuteActionsIf="true">
+              <Value>objectId</Value>
+              <Action>SkipThisOrchestrationStep</Action>
+            </Precondition>
+            <Precondition Type="ClaimEquals" ExecuteActionsIf="true">
+              <Value>portfolioMemberCompany</Value>
+              <Value>false</Value>
+              <Action>SkipThisOrchestrationStep</Action>
+            </Precondition>
+          </Preconditions>
+          <ClaimsExchanges>
+            <ClaimsExchange Id="AADUserWrite" TechnicalProfileReferenceId="AAD-UserWriteUsingAlternativeSecurityId" />
+          </ClaimsExchanges>
+        </OrchestrationStep>
+        <OrchestrationStep Order="5" Type="ClaimsExchange">
+          <Preconditions>
+            <Precondition Type="ClaimEquals" ExecuteActionsIf="true">
+              <Value>portfolioMemberCompany</Value>
+              <Value>true</Value>
+              <Action>SkipThisOrchestrationStep</Action>
+            </Precondition>
+          </Preconditions>
+          <ClaimsExchanges>
+            <ClaimsExchange Id="CX-2-BlockedUserPage" TechnicalProfileReferenceId="StartBlockedUserPage" />
+          </ClaimsExchanges>
+        </OrchestrationStep>
+        <OrchestrationStep Order="6" Type="SendClaims" CpimIssuerTechnicalProfileReferenceId="JwtIssuer" />
+      </OrchestrationSteps>
+      <ClientDefinition ReferenceId="DefaultWeb" />
+    </UserJourney>
+  </UserJourneys>
+</TrustFrameworkPolicy>
